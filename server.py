@@ -38,9 +38,13 @@ print("Server is up and listening.")
 
 def shutDown():
     pass
-def broadcast(senderSoc: socket.socket,name:str, msg:str):
-    print("Testing")
-    pass
+
+
+def broadcast(senderSoc: socket.socket, name: str, msg: str):
+    msg = name + ':' + msg
+    for username in clients:
+        if username != name:
+            clients[username].send(msg.encode())
 
 
 def connectNewClient(clientSoc: socket.socket) -> str:
@@ -62,7 +66,8 @@ def connectNewClient(clientSoc: socket.socket) -> str:
 
     return name
 
-def listenToClient(clientSoc:socket.socket, name:str):
+
+def listenToClient(clientSoc: socket.socket, name: str):
     # listening to messages from the client
     while True:
         try:
@@ -70,17 +75,12 @@ def listenToClient(clientSoc:socket.socket, name:str):
 
             # we sent the message to its destination
             # case 1: broadcast
+            broadcast(clientSoc, name, msg)
 
         # connection closed or some other  error occured
         except Exception as e:
             print(f"Error {e}")
             del clients[name]
-
-        else:
-            for username in clients:
-                if username != name:
-                    clients[username].send(msg.encode())
-
 
 while True:
     clientSoc, caddr = serverSocket.accept()
@@ -88,4 +88,4 @@ while True:
     client_name = connectNewClient(clientSoc)
     # assign the client its own thread and send him off
     # we make it a daemon thread so it wont stop the server from closing when it want to
-    Thread(target=listenToClient, args=(clientSoc,client_name), daemon=True).start()
+    Thread(target=listenToClient, args=(clientSoc, client_name), daemon=True).start()
