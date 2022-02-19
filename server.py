@@ -37,23 +37,37 @@ print("Server is up and listening.")
 
 
 def shutDown():
+    """
+    Gracefully shut down the server
+    """
     pass
 
 
-def broadcast(senderSoc: socket.socket, name: str, msg: str):
+def broadcast(name: str, msg: str):
+    """
+    sends message to all the connected users
+    :param name: sender name
+    :param msg: message to send
+    """
     msg = name + ':' + msg
     for username in clients:
         if username != name:
             clients[username].send(msg.encode())
 
 
-def directMessage(senderName: str, receiverName, msg:str):
+def directMessage(senderName: str, receiverName, msg: str):
+    """
+    Send private message to specific user
+    """
     msg = senderName + '[DM]: ' + msg
     clients[receiverName].send(msg.encode())
 
 
-
 def connectNewClient(clientSoc: socket.socket) -> str:
+    """
+    Connect and get name from new users
+    :param clientSoc:  The socket that belong to the new client
+    """
     # get user name from client
     name: str
     try:  # make sure the name picked by the user is not taken
@@ -67,7 +81,7 @@ def connectNewClient(clientSoc: socket.socket) -> str:
         print(f"Receiving Error {e} ")
         sys.exit()
 
-    broadcast(clientSoc, "", f"> {name} joined the conversation")
+    broadcast("", f"> {name} joined the conversation")
     # print(f"{name} joined the conversation")
     clients[name] = clientSoc
 
@@ -75,18 +89,25 @@ def connectNewClient(clientSoc: socket.socket) -> str:
 
 
 def listenToClient(clientSoc: socket.socket, name: str):
+    """
+    A function meant to called by a daemon thread.
+    used to listen to the requests of a single client
+    :param clientSoc: the costumer
+    :param name: client's name
+    """
     # listening to messages from the client
     while True:
         try:
             msg = clientSoc.recv(1024).decode()
 
             if len(msg) == 0:
+                broadcast("", f"> {name} disconnected")
                 clientSoc.close()
                 return
 
             msg = msg.split(":")
             if msg[0] == "all":
-                broadcast(clientSoc, name, ''.join(msg[1:]))
+                broadcast(name, ''.join(msg[1:]))
                 continue
 
             if msg[0] in clients.keys():
