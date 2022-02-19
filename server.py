@@ -47,6 +47,12 @@ def broadcast(senderSoc: socket.socket, name: str, msg: str):
             clients[username].send(msg.encode())
 
 
+def directMessage(senderName: str, receiverName, msg:str):
+    msg = senderName + '[DM]: ' + msg
+    clients[receiverName].send(msg.encode())
+
+
+
 def connectNewClient(clientSoc: socket.socket) -> str:
     # get user name from client
     name: str
@@ -61,7 +67,8 @@ def connectNewClient(clientSoc: socket.socket) -> str:
         print(f"Receiving Error {e} ")
         sys.exit()
 
-    print(f"This is the name -> {name}")
+    broadcast(clientSoc, "", f"> {name} joined the conversation")
+    # print(f"{name} joined the conversation")
     clients[name] = clientSoc
 
     return name
@@ -73,14 +80,26 @@ def listenToClient(clientSoc: socket.socket, name: str):
         try:
             msg = clientSoc.recv(1024).decode()
 
-            # we sent the message to its destination
-            # case 1: broadcast
-            broadcast(clientSoc, name, msg)
+            if len(msg) == 0:
+                clientSoc.close()
+                return
+
+            msg = msg.split(":")
+            if msg[0] == "all":
+                broadcast(clientSoc, name, ''.join(msg[1:]))
+                continue
+
+            if msg[0] in clients.keys():
+                directMessage(name, msg[0], ''.join(msg[1:]))
+
+            else:
+                clientSoc.send("User does not exits".encode())
 
         # connection closed or some other  error occured
         except Exception as e:
             print(f"Error {e}")
             del clients[name]
+
 
 while True:
     clientSoc, caddr = serverSocket.accept()

@@ -4,9 +4,10 @@ from threading import Thread
 
 serverPort = 50000
 serverIp = socket.gethostname()
-menu = "what would you like to do?\nTo send a public message: insert p followed by new line and your message  \nTo " \
-       "send " \
-       "a private message :insert r followed by new line and your message\nTo quit: insert q\n "
+menu = "what would you like to do?\nTo send a public message: insert public and press enter\n" \
+    "To send a private message type person name and press enter\n" \
+    "To quit enter q\n" \
+    "To return to menu enter -X-"
 
 
 
