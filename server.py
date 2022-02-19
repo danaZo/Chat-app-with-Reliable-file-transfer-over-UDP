@@ -39,6 +39,7 @@ print("Server is up and listening.")
 def shutDown():
     pass
 def broadcast(senderSoc: socket.socket,name:str, msg:str):
+    print("Testing")
     pass
 
 
