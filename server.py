@@ -7,40 +7,53 @@ serverPort = 50000
 serverIP = socket.gethostname()
 clients: {socket.socket}
 clients = dict()
+serverSocket: socket.socket
 
-# server initialization
-try:
-    serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-except socket.error as e:
-    print(f"Error opening socket: {e}")
-    sys.exit()
 
-try:
-    serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-except socket.error as e:
-    print(f"Socket setting Error {e}")
-    sys.exit()
+def setUpServer():
+    global serverSocket
+    # server initialization
+    try:
+        serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error as e:
+        print(f"Error opening socket: {e}")
+        sys.exit()
 
-try:
-    serverSocket.bind((serverIP, serverPort))
-except socket.error as e:
-    print(f"Socket binding Error {e}")
-    sys.exit()
+    try:
+        serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except socket.error as e:
+        print(f"Socket setting Error {e}")
+        sys.exit()
 
-try:
-    serverSocket.listen(5)
-except socket.error as e:
-    print(f"Socket listening Error {e}")
-    sys.exit()
+    try:
+        serverSocket.bind((serverIP, serverPort))
+    except socket.error as e:
+        print(f"Socket binding Error {e}")
+        sys.exit()
 
-print("Server is up and listening.")
+    try:
+        serverSocket.listen(5)
+    except socket.error as e:
+        print(f"Socket listening Error {e}")
+        sys.exit()
+
+    print("Server is up and listening.")
 
 
 def shutDown():
     """
     Gracefully shut down the server
     """
-    pass
+    for soc in clients:
+        soc.close()
+        sys.exit()
+
+
+def getOnlineUsers(client: socket.socket):
+    res = ""
+    for name in clients.keys():
+        res = res + name + ', '
+    client.send(f"Users Online: {res[:-2]}".encode())
 
 
 def broadcast(name: str, msg: str):
@@ -88,6 +101,12 @@ def connectNewClient(clientSoc: socket.socket) -> str:
     return name
 
 
+def disconnectClient(clientSoc: socket.socket, name: str):
+    del clients[name]
+    clientSoc.close()
+    broadcast("", f"> {name} disconnected")
+
+
 def listenToClient(clientSoc: socket.socket, name: str):
     """
     A function meant to called by a daemon thread.
@@ -101,20 +120,25 @@ def listenToClient(clientSoc: socket.socket, name: str):
             msg = clientSoc.recv(1024).decode()
 
             if len(msg) == 0:
-                broadcast("", f"> {name} disconnected")
-                clientSoc.close()
+                disconnectClient(clientSoc, name)
                 return
 
             msg = msg.split(":")
             if msg[0] == "all":
                 broadcast(name, ''.join(msg[1:]))
                 continue
-
+            if msg[0] == "quit":
+                disconnectClient(clientSoc,name)
+                return
             if msg[0] in clients.keys():
                 directMessage(name, msg[0], ''.join(msg[1:]))
+                continue
 
+            if msg[0] == 'online':
+                getOnlineUsers(clientSoc)
+                continue
             else:
-                clientSoc.send("User does not exits".encode())
+                clientSoc.send("Unknown user or command ".encode())
 
         # connection closed or some other  error occured
         except Exception as e:
@@ -122,6 +146,7 @@ def listenToClient(clientSoc: socket.socket, name: str):
             del clients[name]
 
 
+setUpServer()
 while True:
     clientSoc, caddr = serverSocket.accept()
     print(f"{caddr[1]} connected to the server")
