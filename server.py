@@ -7,43 +7,80 @@ serverPort = 50000
 serverIP = socket.gethostname()
 clients: {socket.socket}
 clients = dict()
+serverSocket: socket.socket
 
-# server initialization
-try:
-    serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-except socket.error as e:
-    print(f"Error opening socket: {e}")
-    sys.exit()
 
-try:
-    serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-except socket.error as e:
-    print(f"Socket setting Error {e}")
-    sys.exit()
+def setUpServer():
+    global serverSocket
+    # server initialization
+    try:
+        serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error as e:
+        print(f"Error opening socket: {e}")
+        sys.exit()
 
-try:
-    serverSocket.bind((serverIP, serverPort))
-except socket.error as e:
-    print(f"Socket binding Error {e}")
-    sys.exit()
+    try:
+        serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except socket.error as e:
+        print(f"Socket setting Error {e}")
+        sys.exit()
 
-try:
-    serverSocket.listen(5)
-except socket.error as e:
-    print(f"Socket listening Error {e}")
-    sys.exit()
+    try:
+        serverSocket.bind((serverIP, serverPort))
+    except socket.error as e:
+        print(f"Socket binding Error {e}")
+        sys.exit()
 
-print("Server is up and listening.")
+    try:
+        serverSocket.listen(5)
+    except socket.error as e:
+        print(f"Socket listening Error {e}")
+        sys.exit()
+
+    print("Server is up and listening.")
 
 
 def shutDown():
-    pass
-def broadcast(senderSoc: socket.socket,name:str, msg:str):
-    print("Testing")
-    pass
+    """
+    Gracefully shut down the server
+    """
+    for soc in clients:
+        soc.close()
+        sys.exit()
+
+
+def getOnlineUsers(client: socket.socket):
+    res = ""
+    for name in clients.keys():
+        res = res + name + ', '
+    client.send(f"Users Online: {res[:-2]}".encode())
+
+
+def broadcast(name: str, msg: str):
+    """
+    sends message to all the connected users
+    :param name: sender name
+    :param msg: message to send
+    """
+    msg = name + ':' + msg
+    for username in clients:
+        if username != name:
+            clients[username].send(msg.encode())
+
+
+def directMessage(senderName: str, receiverName, msg: str):
+    """
+    Send private message to specific user
+    """
+    msg = senderName + '[DM]: ' + msg
+    clients[receiverName].send(msg.encode())
 
 
 def connectNewClient(clientSoc: socket.socket) -> str:
+    """
+    Connect and get name from new users
+    :param clientSoc:  The socket that belong to the new client
+    """
     # get user name from client
     name: str
     try:  # make sure the name picked by the user is not taken
@@ -57,35 +94,63 @@ def connectNewClient(clientSoc: socket.socket) -> str:
         print(f"Receiving Error {e} ")
         sys.exit()
 
-    print(f"This is the name -> {name}")
+    broadcast("", f"> {name} joined the conversation")
+    # print(f"{name} joined the conversation")
     clients[name] = clientSoc
 
     return name
 
-def listenToClient(clientSoc:socket.socket, name:str):
+
+def disconnectClient(clientSoc: socket.socket, name: str):
+    del clients[name]
+    clientSoc.close()
+    broadcast("", f"> {name} disconnected")
+
+
+def listenToClient(clientSoc: socket.socket, name: str):
+    """
+    A function meant to called by a daemon thread.
+    used to listen to the requests of a single client
+    :param clientSoc: the costumer
+    :param name: client's name
+    """
     # listening to messages from the client
     while True:
         try:
             msg = clientSoc.recv(1024).decode()
 
-            # we sent the message to its destination
-            # case 1: broadcast
+            if len(msg) == 0:
+                disconnectClient(clientSoc, name)
+                return
+
+            msg = msg.split(":")
+            if msg[0] == "all":
+                broadcast(name, ''.join(msg[1:]))
+                continue
+            if msg[0] == "quit":
+                disconnectClient(clientSoc,name)
+                return
+            if msg[0] in clients.keys():
+                directMessage(name, msg[0], ''.join(msg[1:]))
+                continue
+
+            if msg[0] == 'online':
+                getOnlineUsers(clientSoc)
+                continue
+            else:
+                clientSoc.send("Unknown user or command ".encode())
 
         # connection closed or some other  error occured
         except Exception as e:
             print(f"Error {e}")
             del clients[name]
 
-        else:
-            for username in clients:
-                if username != name:
-                    clients[username].send(msg.encode())
 
-
+setUpServer()
 while True:
     clientSoc, caddr = serverSocket.accept()
     print(f"{caddr[1]} connected to the server")
     client_name = connectNewClient(clientSoc)
     # assign the client its own thread and send him off
     # we make it a daemon thread so it wont stop the server from closing when it want to
-    Thread(target=listenToClient, args=(clientSoc,client_name), daemon=True).start()
+    Thread(target=listenToClient, args=(clientSoc, client_name), daemon=True).start()
