@@ -19,6 +19,7 @@ def connectToServer(soc: socket.socket):
         response = b''
         soc.connect((serverIp, serverPort))
         while response.decode() != "NAME_OK":
+            print(response.decode())
             name = input("Enter your user name: ")
             soc.send(name.encode())
             response = soc.recv(128)
