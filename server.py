@@ -7,6 +7,7 @@ serverPort = 50000
 serverIP = socket.gethostname()
 clients: {socket.socket}
 clients = dict()
+forbbidenNames = ["all", "quit", "online"]
 serverSocket: socket.socket
 
 
@@ -85,8 +86,8 @@ def connectNewClient(clientSoc: socket.socket) -> str:
     name: str
     try:  # make sure the name picked by the user is not taken
         name = clientSoc.recv(128).decode()
-        while name in clients.keys():
-            clientSoc.send("<Username taken, please pick another>".encode())
+        while name in clients.keys() or name in forbbidenNames:
+            clientSoc.send("<Username taken or forbidden, please pick another>".encode())
             name = clientSoc.recv(128).decode()
         clientSoc.send("NAME_OK".encode())
 
