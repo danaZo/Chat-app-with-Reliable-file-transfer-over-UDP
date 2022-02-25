@@ -1,6 +1,6 @@
 import socket
 from threading import Thread
-import sys
+import sys,os
 from typing import Set
 import time
 
@@ -11,7 +11,6 @@ clients: {socket.socket}
 clients = dict()
 clientAddr = dict()
 clientFilePort = dict()
-filesOnServer: Set[str]
 forbbidenNames = ["all", "quit", "online"]
 serverSocket: socket.socket
 fileSoc: socket.socket
@@ -23,6 +22,7 @@ def setUpServer():
     try:
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         fileSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        fileSoc.bind((socket.gethostname(), 50000))
 
     except socket.error as e:
         print(f"Error opening socket: {e}")
@@ -67,27 +67,23 @@ def getOnlineUsers(client: socket.socket):
     client.send(f"Users Online: {res[:-2]}".encode())
 
 
-def getFilesOnserver(client: socket.socket):
-    res = ""
-
-    for f in filesOnServer:
-        res = res + f + ', '
-
-    client.send(f"Available files: {res}".encode())
+def getFilesOnserver(client: socket.socket, name:str):
+    directMessage("Available files: ",name, str(os.listdir('Files')))
 
 
 def sendFile(client: socket.socket, filename: str):
     global fileSoc
-    print(fileSoc)
-    time.sleep(0.1)
+    time.sleep(0.1) # make sure the receiver has enough to open its socket
     # open the requested file if it exits
     packetList = []
     pacNo = 0
-    print("file name: " + filename)
+
     filename = 'Files/' + filename
 
     try:
+
         f = open(filename, 'rb')
+
 
     except IOError:
         client.send("File does not exits".encode())
@@ -100,17 +96,14 @@ def sendFile(client: socket.socket, filename: str):
         if segment == b'':
             break
         segment = pacNo.to_bytes(4, 'big') + segment  # add the serial number of the packet
-        packetList.append(segment)
+        packetList.append(segment) # store the file as list of ordered packets
         pacNo += 1
     f.close()
     # open UDP socket for the server
     try:
         # send the name of the file
-        fileSoc.bind((socket.gethostname(), 50000))
         fileSoc.sendto(filename[6:].encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
-        print(clientAddr[clientSoc][1])
-
-        # send the number of packets
+        # send the number of packets that were extracted from the file
         fileSoc.sendto(str(pacNo).encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
 
         # send the packets
@@ -122,10 +115,6 @@ def sendFile(client: socket.socket, filename: str):
     except socket.error as e:
         print(f"Could not send the file {e}")
         return
-
-
-def saveFileToserver():
-    pass
 
 
 def broadcast(name: str, msg: str):
@@ -212,13 +201,14 @@ def listenToClient(clientSoc: socket.socket,  name: str):
                 continue
 
             if msg[0] == 'file':
-                print(clientSoc)
                 sendFile(clientSoc, msg[1])
                 continue
 
             if msg[0] == 'online':
                 getOnlineUsers(clientSoc)
                 continue
+            if msg[0] =='getfiles':
+                getFilesOnserver(clientSoc, name)
             else:
                 clientSoc.send("Unknown user or command ".encode())
 
