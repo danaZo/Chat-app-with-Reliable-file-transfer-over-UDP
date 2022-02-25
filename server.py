@@ -1,21 +1,29 @@
 import socket
 from threading import Thread
 import sys
+from typing import Set
+import time
 
 MSG_HDR = 10
 serverPort = 50000
 serverIP = socket.gethostname()
 clients: {socket.socket}
 clients = dict()
+clientAddr = dict()
+clientFilePort = dict()
+filesOnServer: Set[str]
 forbbidenNames = ["all", "quit", "online"]
 serverSocket: socket.socket
+fileSoc: socket.socket
 
 
 def setUpServer():
-    global serverSocket
+    global serverSocket, fileSoc
     # server initialization
     try:
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        fileSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     except socket.error as e:
         print(f"Error opening socket: {e}")
         sys.exit()
@@ -48,6 +56,8 @@ def shutDown():
     for soc in clients:
         soc.close()
         sys.exit()
+    fileSoc.close()
+    serverSocket.close()
 
 
 def getOnlineUsers(client: socket.socket):
@@ -55,6 +65,67 @@ def getOnlineUsers(client: socket.socket):
     for name in clients.keys():
         res = res + name + ', '
     client.send(f"Users Online: {res[:-2]}".encode())
+
+
+def getFilesOnserver(client: socket.socket):
+    res = ""
+
+    for f in filesOnServer:
+        res = res + f + ', '
+
+    client.send(f"Available files: {res}".encode())
+
+
+def sendFile(client: socket.socket, filename: str):
+    global fileSoc
+    print(fileSoc)
+    time.sleep(0.1)
+    # open the requested file if it exits
+    packetList = []
+    pacNo = 0
+    print("file name: " + filename)
+    filename = 'Files/' + filename
+
+    try:
+        f = open(filename, 'rb')
+
+    except IOError:
+        client.send("File does not exits".encode())
+        return
+
+    # split the file into packets of 1350 Bytes
+
+    while True:
+        segment = f.read(1350)
+        if segment == b'':
+            break
+        segment = pacNo.to_bytes(4, 'big') + segment  # add the serial number of the packet
+        packetList.append(segment)
+        pacNo += 1
+    f.close()
+    # open UDP socket for the server
+    try:
+        # send the name of the file
+        fileSoc.bind((socket.gethostname(), 50000))
+        fileSoc.sendto(filename[6:].encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
+        print(clientAddr[clientSoc][1])
+
+        # send the number of packets
+        fileSoc.sendto(str(pacNo).encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
+
+        # send the packets
+        for pac in packetList:
+            fileSoc.sendto(pac, (socket.gethostname(), clientAddr[clientSoc][1]))
+
+
+
+    except socket.error as e:
+        print(f"Could not send the file {e}")
+        return
+
+
+def saveFileToserver():
+    pass
 
 
 def broadcast(name: str, msg: str):
@@ -108,18 +179,21 @@ def disconnectClient(clientSoc: socket.socket, name: str):
     broadcast("", f"> {name} disconnected")
 
 
-def listenToClient(clientSoc: socket.socket, name: str):
+def listenToClient(clientSoc: socket.socket,  name: str):
     """
     A function meant to called by a daemon thread.
     used to listen to the requests of a single client
     :param clientSoc: the costumer
     :param name: client's name
     """
+
     # listening to messages from the client
     while True:
+
+
         try:
             msg = clientSoc.recv(1024).decode()
-
+            print("command: " + msg)
             if len(msg) == 0:
                 disconnectClient(clientSoc, name)
                 return
@@ -128,11 +202,18 @@ def listenToClient(clientSoc: socket.socket, name: str):
             if msg[0] == "all":
                 broadcast(name, ''.join(msg[1:]))
                 continue
+
             if msg[0] == "quit":
-                disconnectClient(clientSoc,name)
+                disconnectClient(clientSoc, name)
                 return
+
             if msg[0] in clients.keys():
                 directMessage(name, msg[0], ''.join(msg[1:]))
+                continue
+
+            if msg[0] == 'file':
+                print(clientSoc)
+                sendFile(clientSoc, msg[1])
                 continue
 
             if msg[0] == 'online':
@@ -150,6 +231,7 @@ def listenToClient(clientSoc: socket.socket, name: str):
 setUpServer()
 while True:
     clientSoc, caddr = serverSocket.accept()
+    clientAddr[clientSoc] = caddr
     print(f"{caddr[1]} connected to the server")
     client_name = connectNewClient(clientSoc)
     # assign the client its own thread and send him off
