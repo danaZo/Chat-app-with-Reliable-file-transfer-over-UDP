@@ -1,7 +1,13 @@
+import pickle
 import signal
 import socket
 import sys, os
+import time
 from threading import Thread, main_thread
+
+ACK_REQ = 10000000
+fSizeInPkts: int
+fname: str
 
 is_windows = sys.platform.startswith('win')
 serverPort = 50000
@@ -31,7 +37,6 @@ def connectToServer(soc: socket.socket, udp: socket.socket):
 
 
 def getMessages(soc: socket.socket):
-
     while True:
         try:
             message = soc.recv(2048).decode()
@@ -54,7 +59,10 @@ def sendMessage(soc: socket.socket, fileSoc: socket.socket):
             return
 
         if message[:4] == 'file':
-            print("f")
+            # we open a new tcp socket for system messages between the server and the client
+            # try:
+            #     controlSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # except socket.error:
             Thread(target=getFile, daemon=True, args=(fileSoc,)).start()
 
         # if message.split(':')[0] == 'file':
@@ -73,26 +81,55 @@ def getFile(fileSoc: socket.socket):
     filename, _ = fileSoc.recvfrom(128)
     print(filename)
     packetsNum, _ = fileSoc.recvfrom(128)
-    print(packetsNum)
     packetsNum = int(packetsNum.decode())
+    print("size in packets: " + str(packetsNum))
 
-    packets = [b''] * packetsNum # list to save the received packets
-    receivedPkts = 0
+    packets = [b''] * packetsNum  # list to save the received packets
 
+    fileSoc.settimeout(1)  # close thread and socket if no data sent for 5 seconds
     f = open(filename.decode(), 'wb')
+    try:
+        while True:
+            # get the number of packets sent this round
+            data, addr = fileSoc.recvfrom(2048)
+            fileSoc.sendto("PKTSNO_OK".encode(), addr)
 
-    while True:
+            size = int(data[7:].decode())
+            print("receiving " + str(size) + " packets")
 
-        data, _ = fileSoc.recvfrom(2048)
-        receivedPkts += 1
-        print(int.from_bytes(data[:4], byteorder='big'))
-        packets[int.from_bytes(data[:4], byteorder='big')] = data[4:]
-        if receivedPkts == packetsNum:
-            break
+            Acks = []
 
-    for pac in packets:
-        f.write(pac)
-    f.close()
+            while True:
+
+                # get packets from server
+                pac, _ = fileSoc.recvfrom(2048)
+                # check if the pac is part of the file or it is an ack request
+                seqNo = int.from_bytes(pac[:4], byteorder='big')
+                if seqNo == ACK_REQ:
+                    # we send the ACK list to the server
+                    fileSoc.sendto(pickle.dumps(Acks), addr)
+                    continue
+                # check if we got the package already
+
+                if packets[seqNo] == b'':  # packet haven't buffered before - solve problem of duplicate packets
+                    packets[seqNo] = pac[4:]
+                    print(seqNo)
+                    Acks.append(seqNo)  # mark that we got this package
+                    size -= 1
+            if b'' not in packets:
+                print("all packets received successfully")
+                # read the last ACK_REQ to clear the buffer
+                d , _ =fileSoc.recvfrom(128)
+                print(f"leftovers {d}")
+                break
+
+        for pac in packets:
+            f.write(pac)
+        f.close()
+        # flush remaining data
+        fileSoc.settimeout(0.1)
+    except socket.error:
+        f.close()
 
 
 if __name__ == '__main__':
@@ -108,3 +145,4 @@ if __name__ == '__main__':
     sendMessage(clientSoc, fileSoc)
 
     clientSoc.close()
+    fileSoc.close()

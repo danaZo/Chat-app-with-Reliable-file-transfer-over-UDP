@@ -1,7 +1,8 @@
 import socket
 from threading import Thread
-import sys,os
-from typing import Set
+import sys, os
+import pickle
+
 import time
 
 MSG_HDR = 10
@@ -10,8 +11,9 @@ serverIP = socket.gethostname()
 clients: {socket.socket}
 clients = dict()
 clientAddr = dict()
-clientFilePort = dict()
+clientFileSoc = dict()
 forbbidenNames = ["all", "quit", "online"]
+ACK_REQ = 10000000
 serverSocket: socket.socket
 fileSoc: socket.socket
 
@@ -67,13 +69,50 @@ def getOnlineUsers(client: socket.socket):
     client.send(f"Users Online: {res[:-2]}".encode())
 
 
-def getFilesOnserver(client: socket.socket, name:str):
-    directMessage("Available files: ",name, str(os.listdir('Files')))
+def getFilesOnserver(client: socket.socket, name: str):
+    directMessage("Available files: ", name, str(os.listdir('Files')))
 
 
-def sendFile(client: socket.socket, filename: str):
+def sendPkstByNums(indices: list, packetList: list, fileSoc: socket.socket, addr):
+    # send the number of packets to send
+    fileSoc.settimeout(1)
+    print(f"Sending {len(indices)} packets")
+    while True:
+        fileSoc.sendto(("PKTS_NO" + str(len(indices))).encode(), addr)
+        data, _ = fileSoc.recvfrom(128)
+        if data.decode()[:9] == "PKTSNO_OK":
+            break
+
+    boolVal = True
+    packetToLoose = [1, 3, 5, 8]
+
+    while indices:
+        for i in indices:
+            if i == 10 and boolVal:
+                boolVal = False
+                continue
+            fileSoc.sendto(packetList[i], addr)
+        # eliminate the Ack'ed packets from the list
+        time.sleep(0.15)
+
+
+        fileSoc.sendto(ACK_REQ.to_bytes(4, 'big'), addr)
+        data, _ = fileSoc.recvfrom(1024)
+        acked = pickle.loads(data)  # contain the Acked packets
+        indices = [x for x in indices if x not in acked]
+        if len(indices) == 0:
+            print("all packets received successfully")
+            break
+
+
+        print("retransmiting packets: " + str(indices))
+
+    print(f"all {len(indices)} packets ACK'ed")
+
+
+def sendFile(client: socket.socket, filename: str, client_name: str):
     global fileSoc
-    time.sleep(0.1) # make sure the receiver has enough to open its socket
+
     # open the requested file if it exits
     packetList = []
     pacNo = 0
@@ -96,7 +135,7 @@ def sendFile(client: socket.socket, filename: str):
         if segment == b'':
             break
         segment = pacNo.to_bytes(4, 'big') + segment  # add the serial number of the packet
-        packetList.append(segment) # store the file as list of ordered packets
+        packetList.append(segment)  # store the file as list of ordered packets
         pacNo += 1
     f.close()
     # open UDP socket for the server
@@ -107,8 +146,10 @@ def sendFile(client: socket.socket, filename: str):
         fileSoc.sendto(str(pacNo).encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
 
         # send the packets
-        for pac in packetList:
-            fileSoc.sendto(pac, (socket.gethostname(), clientAddr[clientSoc][1]))
+        sendPkstByNums(list(range(pacNo)), packetList, fileSoc, (socket.gethostname(), clientAddr[clientSoc][1]))
+        # sendPkstByNums(list(range(int(pacNo/2))), packetList, fileSoc, (socket.gethostname(), clientAddr[clientSoc][1]))
+        # sendPkstByNums(list(range(int(pacNo / 2), pacNo)), packetList, fileSoc,
+        #                (socket.gethostname(), clientAddr[clientSoc][1]))
 
 
 
@@ -168,7 +209,7 @@ def disconnectClient(clientSoc: socket.socket, name: str):
     broadcast("", f"> {name} disconnected")
 
 
-def listenToClient(clientSoc: socket.socket,  name: str):
+def listenToClient(clientSoc: socket.socket, name: str):
     """
     A function meant to called by a daemon thread.
     used to listen to the requests of a single client
@@ -178,7 +219,6 @@ def listenToClient(clientSoc: socket.socket,  name: str):
 
     # listening to messages from the client
     while True:
-
 
         try:
             msg = clientSoc.recv(1024).decode()
@@ -201,13 +241,13 @@ def listenToClient(clientSoc: socket.socket,  name: str):
                 continue
 
             if msg[0] == 'file':
-                sendFile(clientSoc, msg[1])
+                sendFile(clientSoc, msg[1], name)
                 continue
 
             if msg[0] == 'online':
                 getOnlineUsers(clientSoc)
                 continue
-            if msg[0] =='getfiles':
+            if msg[0] == 'getfiles':
                 getFilesOnserver(clientSoc, name)
             else:
                 clientSoc.send("Unknown user or command ".encode())
