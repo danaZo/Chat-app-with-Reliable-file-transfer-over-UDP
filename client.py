@@ -9,6 +9,8 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 import tkinter.messagebox
+import tkinter as tk
+from errRecieve import decodeData
 
 ACK_REQ = 10000000
 STOP_REQ = 20000000
@@ -17,7 +19,10 @@ fname: str
 
 is_windows = sys.platform.startswith('win')
 serverPort = 50000
+#serverIp = '10.100.102.12'
 serverIp = socket.gethostname()
+
+
 menu = "WELCOME!\n\nAt the left side box, you can type the following commands:\n" \
        "all : To send a public message\n" \
        "member's name : To send a private message to specific member (write the member's name)\n" \
@@ -25,9 +30,12 @@ menu = "WELCOME!\n\nAt the left side box, you can type the following commands:\n
        "online : To get a list of online members names\n" \
        "getfiles : To get the list of files that able to be downloaded\n" \
        "file : To download a file from the existing files"
+
 FORMAT = "utf-8"
+
 clientSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 fileSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 
 """
 In this class we have the chat GUI from the client's side
@@ -101,7 +109,7 @@ class GUI:
         self.Window.deiconify()
         self.Window.title("ChatRoom")
         self.Window.resizable(width=True, height=True)
-        self.Window.configure(width=900, height=800, bg="#17202A")
+        self.Window.configure(width=900, height=730, bg='white')
 
         # the label with the client's name
         self.labelHead = Label(self.Window, bg="#17202A", fg="#EAECEE", text=self.name, font="Helvetica 13 bold", pady=5)
@@ -111,21 +119,22 @@ class GUI:
         self.line.place(relwidth=1, rely=0.07, relheight=0.012)
 
         # the place where text appears
-        self.textCons = Text(self.Window, width=20, height=2, bg="#17202A", fg="#EAECEE", font="Helvetica 14", padx=5, pady=5)
+        self.textCons = Text(self.Window, width=20, height=2, bg="white", fg="black", font="Helvetica 14", padx=5, pady=5)
         self.textCons.place(relheight=0.745, relwidth=1, rely=0.08)
 
         self.labelBottom = Label(self.Window, bg="#ABB2B9", height=80)
         self.labelBottom.place(relwidth=1, rely=0.925)
 
         # the text above the smaller box
-        self.labelDown = Label(self.Window, bg="#17202A", fg="#EAECEE",
+        self.labelDown = Label(self.Window, bg="pink", fg="black",
                                text="Commands: all/online/\nmember's name/quit/\ngetfiles/file",
-                               font="Helvetica 13 bold", pady=6)
+                               font="Helvetica 10 bold", pady=6)
         self.labelDown.place(relwidth=0.4 ,rely=0.825 , relx=-0.05)
 
         # the text above the bigger box
         self.labelMsg = Label(self.Window, bg="#17202A", fg="#EAECEE",
-                              text="Type message/file name (blank to online/quit/getfiles commands)",
+                              text="Type message/file name\n"
+                                   "(blank to online/quit/getfiles commands)",
                                font="Helvetica 13 bold", pady=6)
         self.labelMsg.place(relwidth=0.6, rely=0.85, relx=0.25)
 
@@ -136,7 +145,7 @@ class GUI:
 
         # the big box
         self.entryMsg = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
-        self.entryMsg.place(relwidth=0.74, relheight=0.03, rely=0.0, relx=0.3)
+        self.entryMsg.place(relwidth=0.5, relheight=0.03, rely=0.0, relx=0.3)
         self.entryMsg.focus()
 
         # create a Send Button
@@ -153,6 +162,7 @@ class GUI:
         scrollbar.place(relheight=1, relx=0.974)
         scrollbar.config(command=self.textCons.yview)
         self.textCons.config(state=DISABLED)
+
 
     # function to basically start sending messages
     def sendButton(self, msg):
@@ -189,7 +199,7 @@ class GUI:
                 soc.close()
                 sys.exit()
 
-    def sendMessage(self, soc: socket.socket,fileSoc: socket.socket ):
+    def sendMessage(self, soc: socket.socket, fileSoc: socket.socket ):
         print(menu)
         while True:
             message = self.msg
@@ -206,7 +216,6 @@ class GUI:
             except Exception as e:
                 print(f"Socket error {e}")
                 sys.exit()
-
 
     def getFile(self, fileSoc: socket.socket):
         # get file name and the number of incoming packets
@@ -255,10 +264,22 @@ class GUI:
 
                 if seqNo == STOP_REQ:
                     # create pop up window asking the user to resume the download
-                    res = tkinter.messagebox.askquestion('file download', 'Would you like to continue downloading?')
-                    if res == 'yes':
+                    res = tkinter.messagebox.askyesno('file download', 'Would you like to continue downloading?')
+                    print("hi")
+                    if res is True:
+                        fileSoc.sendto('yes'.encode(), addr)
+                        print("sent")
+                    if str.lower(res) == 'yes':
                         continue
-
+                    else:
+                        return
+                # check if the packet was corrupted
+                # if remainder = 0, the packet is ok
+                # otherwise it's corrupted
+                # remainder = decodeData(pac, '1001')
+                # if remainder != 0:
+                #     print(f"corrupted packet {seqNo}")
+                #     continue
                 # check if we got the package already
 
                 if packets[seqNo] == b'':  # packet haven't buffered before - solves problem of duplicate packets

@@ -36,6 +36,7 @@ b = 1001
 xor(a,b) = 0011000000
 """
 
+
 def xor(a, b):
     result = []
 
@@ -90,13 +91,14 @@ Used at the sender side to encode data by appending remainder of modular divisio
 
 def encodeData(data, key):
     l_key = len(key)
-
+    #data = str(data)
     # Appends n-1 zeroes at end of data
-    appended_data = data + '0' * (l_key - 1)
+    appended_data = data.decode() + '0' * (l_key - 1)
     remainder = mod2div(appended_data, key)
 
     # Append remainder in the original data
     codeword = data + remainder
+    codeword.encode()
     return codeword
 
 
