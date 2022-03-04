@@ -6,6 +6,7 @@ import time
 from threading import Thread, main_thread
 
 ACK_REQ = 10000000
+STOP_REQ = 20000000
 fSizeInPkts: int
 fname: str
 
@@ -99,6 +100,9 @@ def getFile(fileSoc: socket.socket):
             if seqNo == ACK_REQ:
                 # we send the ACK list to the server
                 fileSoc.sendto(pickle.dumps(Acks), addr)
+                continue
+            if seqNo == STOP_REQ:
+                # create pop up window asking the user to resume the download
                 continue
             # check if we got the package already
 
