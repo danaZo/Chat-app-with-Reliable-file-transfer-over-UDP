@@ -7,23 +7,29 @@ import time
 
 MSG_HDR = 10
 serverPort = 50000
-serverIP = socket.gethostname()
+serverIP = '0.0.0.0'
 clients: {socket.socket}
 clients = dict()
 clientAddr = dict()
 clientFileSoc = dict()
-forbbidenNames = ["all", "quit", "online", "file"]
+forbbidenNames = ["all", "quit", "online", "file","getfile"]
 ACK_REQ = 10000000
 STOP_REQ = 20000000
+WIN_SIZE = 10
 serverSocket: socket.socket
 fileSoc: socket.socket
 
 
 def setUpServer():
+    '''
+    a function that set the server up, safely connect
+
+    '''
     global serverSocket, fileSoc
     # server initialization
     try:
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         fileSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         fileSoc.bind((socket.gethostname(), 50000))
 
@@ -75,6 +81,7 @@ def getFilesOnserver(client: socket.socket, name: str):
 
 
 def sendPkstByNums(indices: list, packetList: list, fileSoc: socket.socket, addr):
+    global WIN_SIZE
     # send the number of packets to send
     fileSoc.settimeout(1)
     print(f"Sending {len(indices)} packets")
@@ -83,23 +90,26 @@ def sendPkstByNums(indices: list, packetList: list, fileSoc: socket.socket, addr
     packetToLoose = [1, 3, 5, 8]
 
     while indices:
+        sent = len(indices)
         for i in indices:
             if i == 10 and boolVal:
                 boolVal = False
                 continue
             fileSoc.sendto(packetList[i], addr)
         # eliminate the Ack'ed packets from the list
-        time.sleep(0.15)
-
+        time.sleep(0.02)
 
         fileSoc.sendto(ACK_REQ.to_bytes(4, 'big'), addr)
         data, _ = fileSoc.recvfrom(1024)
         acked = pickle.loads(data)  # contain the Acked packets
-        indices = [x for x in indices if x not in acked]
+        indices = [x for x in indices if x not in acked]  # leaving only the lost packets
         if len(indices) == 0:
+            WIN_SIZE += 1
             print("all packets received successfully")
             break
-
+        lost = len(indices)
+        if lost / sent > 0.1:
+            WIN_SIZE = max(10, int(WIN_SIZE / 2))
 
         print("retransmiting packets: " + str(indices))
 
@@ -124,35 +134,45 @@ def sendFile(client: socket.socket, filename: str, client_name: str):
         client.send("File does not exits".encode())
         return
 
-    # split the file into packets of 1350 Bytes
+    # split the file into packets of 500 Bytes
 
     while True:
-        segment = f.read(1350)
+        segment = f.read(500)
         if segment == b'':
             break
         segment = pacNo.to_bytes(4, 'big') + segment  # add the serial number of the packet
+        # segment = segment + crc
         packetList.append(segment)  # store the file as list of ordered packets
         pacNo += 1
     f.close()
     # open UDP socket for the server
     try:
         # send the name of the file
-        fileSoc.sendto(filename[6:].encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
+        addr = (socket.gethostname(), clientAddr[clientSoc][1])
+        fileSoc.sendto(filename[6:].encode(), addr)
         # send the number of packets that were extracted from the file
-        fileSoc.sendto(str(pacNo).encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
+        fileSoc.sendto(str(pacNo).encode(), addr)
 
         # send the packets
-        addr = (socket.gethostname(), clientAddr[clientSoc][1])
+
         # sendPkstByNums(list(range(pacNo)), packetList, fileSoc, addr)
-        sendPkstByNums(list(range(int(pacNo/2))), packetList, fileSoc,addr )
-        # fileSoc.sendto(STOP_REQ.to_bytes(4, byteorder="big"), addr)
-        sendPkstByNums(list(range(int(pacNo / 2), pacNo)), packetList, fileSoc,addr)
-
-
+        base = 0
+        while base < pacNo / 2:
+            upperBound = min(base + WIN_SIZE, pacNo)
+            sendPkstByNums(list(range(base, upperBound)), packetList, fileSoc, addr)
+            base = upperBound
+        fileSoc.sendto(STOP_REQ.to_bytes(4, 'big'),addr)
+        msg, _ = fileSoc.recvfrom(128)
+        print(msg)
+        if msg.decode() == 'no':
+            return
+        while base < pacNo :
+            upperBound = min(base + WIN_SIZE, pacNo)
+            sendPkstByNums(list(range(base, upperBound)), packetList, fileSoc, addr)
+            base = upperBound
 
 
     except socket.error as e:
-        print(f"Could not send the file {e}")
         return
 
 

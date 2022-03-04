@@ -1,9 +1,7 @@
 import pickle
-import signal
 import socket
-import sys, os
-import time
-from threading import Thread, main_thread
+import sys
+from threading import Thread
 
 ACK_REQ = 10000000
 STOP_REQ = 20000000
@@ -102,7 +100,9 @@ def getFile(fileSoc: socket.socket):
                 fileSoc.sendto(pickle.dumps(Acks), addr)
                 continue
             if seqNo == STOP_REQ:
-                # create pop up window asking the user to resume the download
+                res = 'yes'
+                print(res)
+                fileSoc.sendto(res.encode(), addr)
                 continue
             # check if we got the package already
 
