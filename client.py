@@ -1,3 +1,4 @@
+import binascii
 import pickle
 import signal
 import socket
@@ -265,46 +266,34 @@ class GUI:
                 if seqNo == STOP_REQ:
                     # create pop up window asking the user to resume the download
                     res = tkinter.messagebox.askyesno('file download', 'Would you like to continue downloading?')
-                    print("hi")
                     if res is True:
                         fileSoc.sendto('yes'.encode(), addr)
                         print("sent")
-                    if str.lower(res) == 'yes':
-                        continue
                     else:
+                        fileSoc.sendto('no'.encode(), addr)
                         return
+
                 # check if the packet was corrupted
                 # if remainder = 0, the packet is ok
                 # otherwise it's corrupted
-                # remainder = decodeData(pac, '1001')
-                # if remainder != 0:
-                #     print(f"corrupted packet {seqNo}")
-                #     continue
+                to_check = pac[:-32]
+                remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
+                print(seqNo)
+                print(remainder)
+                old_remainder = pac[-32:]
+                print(old_remainder)
+                if remainder != old_remainder:
+                    print("message corrupted")
+                    continue
+
                 # check if we got the package already
-
                 if packets[seqNo] == b'':  # packet haven't buffered before - solves problem of duplicate packets
-                    packets[seqNo] = pac[4:]
-
-                    self.textCons.config(state=NORMAL)
-                    self.textCons.insert(END, str(seqNo) + "\n\n")
-                    self.textCons.config(state=DISABLED)
-                    self.textCons.see(END)
-                    print(seqNo)
+                    packets[seqNo] = pac[4:504]
                     Acks.append(seqNo)  # mark that we got this package
 
                 if b'' not in packets:
-                    self.textCons.config(state=NORMAL)
-                    self.textCons.insert(END, "all packets received successfully" + "\n\n")
-                    self.textCons.config(state=DISABLED)
-                    self.textCons.see(END)
-                    print("all packets received successfully")
                     # read the last ACK_REQ to clear the buffer
                     d, _ = fileSoc.recvfrom(128)
-                    self.textCons.config(state=NORMAL)
-                    self.textCons.insert(END, f"leftovers {d}" + "\n\n")
-                    self.textCons.config(state=DISABLED)
-                    self.textCons.see(END)
-                    print(f"leftovers {d}")
                     break
 
             for pac in packets:
