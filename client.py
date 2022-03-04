@@ -223,26 +223,11 @@ class GUI:
         self.textCons.insert(END, "Incoming file" + "\n\n")
         self.textCons.config(state=DISABLED)
         self.textCons.see(END)
-        print(fileSoc)
         print("Incoming file")
 
         filename, _ = fileSoc.recvfrom(128)
-        # print to chat the file name
-        self.textCons.config(state=NORMAL)
-        self.textCons.insert(END, str(filename) + "\n\n")
-        self.textCons.config(state=DISABLED)
-        self.textCons.see(END)
-        print(filename)
-
         packetsNum, _ = fileSoc.recvfrom(128)
         packetsNum = int(packetsNum.decode())
-
-        # print to chat the number of packets
-        self.textCons.config(state=NORMAL)
-        self.textCons.insert(END, "size in packets: " + str(packetsNum) + "\n\n")
-        self.textCons.config(state=DISABLED)
-        self.textCons.see(END)
-        print("size in packets: " + str(packetsNum))
 
         packets = [b''] * packetsNum  # list to save the received packets
 
@@ -274,19 +259,18 @@ class GUI:
                 # check if the packet was corrupted
                 # if remainder = 0, the packet is ok
                 # otherwise it's corrupted
-                to_check = pac[:-32]
-                remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
-                print(seqNo)
-                print(remainder)
-                old_remainder = pac[-32:]
-                print(old_remainder)
-                if remainder != old_remainder:
+                # to_check = pac[:-32]
+                # remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
+                # old_remainder = pac[-32:]
+                # if remainder != old_remainder:
+                ans = self.corrupting_check(pac)
+                if ans == -1:
                     print("message corrupted")
                     continue
 
                 # check if we got the package already
                 if packets[seqNo] == b'':  # packet haven't buffered before - solves problem of duplicate packets
-                    packets[seqNo] = pac[4:504]
+                    packets[seqNo] = pac[4:-32]
                     Acks.append(seqNo)  # mark that we got this package
 
                 if b'' not in packets:
@@ -301,6 +285,13 @@ class GUI:
             fileSoc.settimeout(0.1)
         except socket.error:
             f.close()
+
+    def corrupting_check(self, packet):
+        to_check = packet[:-32]
+        remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
+        old_remainder = packet[-32:]
+        if remainder != old_remainder:
+            return -1
 
 
 if __name__ == '__main__':

@@ -161,11 +161,12 @@ def sendFile(client: socket.socket, filename: str, client_name: str):
             sendPkstByNums(list(range(base, upperBound)), packetList, fileSoc, addr)
             base = upperBound
         fileSoc.settimeout(120)
-        fileSoc.sendto(STOP_REQ.to_bytes(4, 'big'), addr)
-        msg, _ = fileSoc.recvfrom(128)
-        print(msg)
-        if str.lower(msg.decode()) == 'no':
-            return
+        if pacNo > 1:
+            fileSoc.sendto(STOP_REQ.to_bytes(4, 'big'), addr)
+            msg, _ = fileSoc.recvfrom(128)
+            print(msg)
+            if str.lower(msg.decode()) == 'no':
+                return
         while base < pacNo:
             upperBound = min(base + WIN_SIZE, pacNo)
             sendPkstByNums(list(range(base, upperBound)), packetList, fileSoc, addr)
