@@ -3,20 +3,16 @@ from io import StringIO
 from unittest.mock import patch
 import filecmp
 import socket
-from tkinter import *
 from client import GUI
 
 
 class MyTestCase(unittest.TestCase):
 
-
-    def test_connect_to_server(self):
-        pass
-
     def test_packet_loss(self):
         pass
 
     def test_packet_corruption(self):
+        # corrupting packets
         pass
 
     def test_isFile(self):
@@ -34,7 +30,6 @@ class MyTestCase(unittest.TestCase):
         tst_path = 'b1.pdf'  # the name of file we downloaded
         ref_path = 'Files/b1.pdf'
         self.assertTrue(filecmp.cmp(tst_path, ref_path, shallow=False))
-
 
 
 if __name__ == '__main__':

@@ -11,7 +11,6 @@ from tkinter import font
 from tkinter import ttk
 import tkinter.messagebox
 import tkinter as tk
-from errRecieve import decodeData
 
 ACK_REQ = 10000000
 STOP_REQ = 20000000
@@ -20,7 +19,6 @@ fname: str
 
 is_windows = sys.platform.startswith('win')
 serverPort = 50000
-#serverIp = '10.100.102.12'
 serverIp = socket.gethostname()
 
 
