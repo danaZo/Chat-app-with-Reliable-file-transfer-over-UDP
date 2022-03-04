@@ -12,8 +12,9 @@ clients: {socket.socket}
 clients = dict()
 clientAddr = dict()
 clientFileSoc = dict()
-forbbidenNames = ["all", "quit", "online"]
+forbbidenNames = ["all", "quit", "online", "file"]
 ACK_REQ = 10000000
+STOP_REQ = 20000000
 serverSocket: socket.socket
 fileSoc: socket.socket
 
@@ -77,11 +78,6 @@ def sendPkstByNums(indices: list, packetList: list, fileSoc: socket.socket, addr
     # send the number of packets to send
     fileSoc.settimeout(1)
     print(f"Sending {len(indices)} packets")
-    while True:
-        fileSoc.sendto(("PKTS_NO" + str(len(indices))).encode(), addr)
-        data, _ = fileSoc.recvfrom(128)
-        if data.decode()[:9] == "PKTSNO_OK":
-            break
 
     boolVal = True
     packetToLoose = [1, 3, 5, 8]
@@ -146,10 +142,12 @@ def sendFile(client: socket.socket, filename: str, client_name: str):
         fileSoc.sendto(str(pacNo).encode(), (socket.gethostname(), clientAddr[clientSoc][1]))
 
         # send the packets
-        sendPkstByNums(list(range(pacNo)), packetList, fileSoc, (socket.gethostname(), clientAddr[clientSoc][1]))
-        # sendPkstByNums(list(range(int(pacNo/2))), packetList, fileSoc, (socket.gethostname(), clientAddr[clientSoc][1]))
-        # sendPkstByNums(list(range(int(pacNo / 2), pacNo)), packetList, fileSoc,
-        #                (socket.gethostname(), clientAddr[clientSoc][1]))
+        addr = (socket.gethostname(), clientAddr[clientSoc][1])
+        # sendPkstByNums(list(range(pacNo)), packetList, fileSoc, addr)
+        sendPkstByNums(list(range(int(pacNo/2))), packetList, fileSoc,addr )
+        # fileSoc.sendto(STOP_REQ.to_bytes(4, byteorder="big"), addr)
+        sendPkstByNums(list(range(int(pacNo / 2), pacNo)), packetList, fileSoc,addr)
+
 
 
 

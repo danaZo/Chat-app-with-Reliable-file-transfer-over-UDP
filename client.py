@@ -88,34 +88,25 @@ def getFile(fileSoc: socket.socket):
 
     fileSoc.settimeout(1)  # close thread and socket if no data sent for 5 seconds
     f = open(filename.decode(), 'wb')
+    Acks = []
     try:
         while True:
-            # get the number of packets sent this round
-            data, addr = fileSoc.recvfrom(2048)
-            fileSoc.sendto("PKTSNO_OK".encode(), addr)
 
-            size = int(data[7:].decode())
-            print("receiving " + str(size) + " packets")
+            # get packets from server
+            pac, addr = fileSoc.recvfrom(2048)
+            # check if the pac is part of the file or it is an ack request
+            seqNo = int.from_bytes(pac[:4], byteorder='big')
+            if seqNo == ACK_REQ:
+                # we send the ACK list to the server
+                fileSoc.sendto(pickle.dumps(Acks), addr)
+                continue
+            # check if we got the package already
 
-            Acks = []
+            if packets[seqNo] == b'':  # packet haven't buffered before - solves problem of duplicate packets
+                packets[seqNo] = pac[4:]
+                print(seqNo)
+                Acks.append(seqNo)  # mark that we got this package
 
-            while True:
-
-                # get packets from server
-                pac, _ = fileSoc.recvfrom(2048)
-                # check if the pac is part of the file or it is an ack request
-                seqNo = int.from_bytes(pac[:4], byteorder='big')
-                if seqNo == ACK_REQ:
-                    # we send the ACK list to the server
-                    fileSoc.sendto(pickle.dumps(Acks), addr)
-                    continue
-                # check if we got the package already
-
-                if packets[seqNo] == b'':  # packet haven't buffered before - solve problem of duplicate packets
-                    packets[seqNo] = pac[4:]
-                    print(seqNo)
-                    Acks.append(seqNo)  # mark that we got this package
-                    size -= 1
             if b'' not in packets:
                 print("all packets received successfully")
                 # read the last ACK_REQ to clear the buffer
