@@ -91,49 +91,49 @@ class GUI:
         self.Window.deiconify()
         self.Window.title("ChatRoom")
         self.Window.resizable(width=True, height=True)
-        self.Window.configure(width=900, height=730, bg='white')
+        self.Window.configure(width=800, height=580, bg='white')
 
         # the label with the client's name
-        self.labelHead = Label(self.Window, bg="#17202A", fg="#EAECEE", text=self.name, font="Helvetica 13 bold",
+        self.labelHead = Label(self.Window, bg="floral white", fg="black", text=self.name, font="Calibri 13 bold",
                                pady=5)
         self.labelHead.place(relwidth=1)
 
-        self.line = Label(self.Window, width=450, bg="#ABB2B9")
+        self.line = Label(self.Window, width=450, bg="cyan2")
         self.line.place(relwidth=1, rely=0.07, relheight=0.012)
 
         # the place where text appears
-        self.textCons = Text(self.Window, width=20, height=2, bg="white", fg="black", font="Helvetica 14", padx=5,
+        self.textCons = Text(self.Window, width=20, height=2, bg="white", fg="black", font="Calibri 14", padx=5,
                              pady=5)
         self.textCons.place(relheight=0.745, relwidth=1, rely=0.08)
 
-        self.labelBottom = Label(self.Window, bg="#ABB2B9", height=80)
+        self.labelBottom = Label(self.Window, bg="cyan2", height=80)
         self.labelBottom.place(relwidth=1, rely=0.925)
 
         # the text above the smaller box
         self.labelDown = Label(self.Window, bg="pink", fg="black",
-                               text="Commands: all/online/\nmember's name/\ngetfiles/file",
-                               font="Helvetica 10 bold", pady=6)
-        self.labelDown.place(relwidth=0.4, rely=0.825, relx=-0.05)
+                               text="Commands:\n all/online/file/\nmember's name/getfiles",
+                               font="Calibri 10 bold", pady=2)
+        self.labelDown.place(relwidth=0.27, rely=0.83, relx=0.005)
 
         # the text above the bigger box
-        self.labelMsg = Label(self.Window, bg="#17202A", fg="#EAECEE",
+        self.labelMsg = Label(self.Window, bg="pink", fg="black",
                               text="Type message/file name\n"
                                    "(blank to online/getfiles commands)",
-                              font="Helvetica 13 bold", pady=6)
-        self.labelMsg.place(relwidth=0.6, rely=0.85, relx=0.25)
+                              font="Calibri 10 bold", pady=8.55)
+        self.labelMsg.place(relwidth=0.6, rely=0.83, relx=0.2839)
 
         # the small box
-        self.entryType = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
+        self.entryType = Entry(self.labelBottom, bg="floral white", fg="black", font="Calibri 13")
         self.entryType.place(relwidth=0.26, relheight=0.03, rely=0.0, relx=0.011)
         self.entryType.focus()
 
         # the big box
-        self.entryMsg = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
-        self.entryMsg.place(relwidth=0.5, relheight=0.03, rely=0.0, relx=0.3)
+        self.entryMsg = Entry(self.labelBottom, bg="floral white", fg="black", font="Calibri 13")
+        self.entryMsg.place(relwidth=0.48, relheight=0.03, rely=0.0, relx=0.28)
         self.entryMsg.focus()
 
         # create a Send Button
-        self.buttonMsg = Button(self.labelBottom, text="Send", font="Helvetica 10 bold", width=20, bg="#ABB2B9",
+        self.buttonMsg = Button(self.labelBottom, text="Send", font="Calibri 14 bold", width=20, bg="light blue", fg="black",
                                 command=lambda: self.sendButton(self.entryType.get() + ':' + self.entryMsg.get()))
         self.buttonMsg.place(relx=0.77, rely=0.0, relheight=0.03, relwidth=0.22)
 
