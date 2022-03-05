@@ -2,9 +2,9 @@ import binascii
 import pickle
 import signal
 import socket
-import sys,os
+import sys, os
 import time
-from threading import Thread,main_thread
+from threading import Thread, main_thread
 import socket
 from tkinter import *
 from tkinter import font
@@ -21,7 +21,6 @@ is_windows = sys.platform.startswith('win')
 serverPort = 50000
 serverIp = socket.gethostname()
 
-
 menu = "WELCOME!\n\nAt the left side box, you can type the following commands:\n" \
        "all : To send a public message\n" \
        "member's name : To send a private message to specific member (write the member's name)\n" \
@@ -35,13 +34,15 @@ FORMAT = "utf-8"
 clientSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 fileSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-
 """
 In this class we have the chat GUI from the client's side
 Since only the clients will interact the server side does not have a GUI
 """
+
+
 class GUI:
 
+    # GUI functions
     def __init__(self):
 
         self.Window = Tk()
@@ -60,7 +61,7 @@ class GUI:
         self.labelName.place(relheight=0.2, relx=0.1, rely=0.2)
 
         self.entryName = Entry(self.login, font="Helvetica 14")
-        self.entryName.place(relwidth=0.4, relheight=0.12,  relx=0.35, rely=0.2)
+        self.entryName.place(relwidth=0.4, relheight=0.12, relx=0.35, rely=0.2)
         self.entryName.focus()
 
         # Construct a Continue Button widget with the parent MASTER.
@@ -71,6 +72,90 @@ class GUI:
         # Call the mainloop of Tk.
         self.Window.mainloop()
 
+    def go_ahead(self, name):
+        # Destroy this and all descendants widgets.
+        self.login.destroy()
+        self.layout(name)
+        # initialize a daemon thread to listen for incoming messages
+        self.connectToServer(clientSoc, fileSoc)
+        self.textCons.config(state=NORMAL)
+        self.textCons.insert(END, "Connected successfully" + "\n\n")
+        self.textCons.insert(END, menu + "\n\n")
+        self.textCons.config(state=DISABLED)
+        self.textCons.see(END)
+        Thread(target=self.getMessages, daemon=True, args=(clientSoc,)).start()
+
+    # The main layout of the chat
+    def layout(self, name):
+        self.name = name
+        # to show chat window
+        self.Window.deiconify()
+        self.Window.title("ChatRoom")
+        self.Window.resizable(width=True, height=True)
+        self.Window.configure(width=900, height=730, bg='white')
+
+        # the label with the client's name
+        self.labelHead = Label(self.Window, bg="#17202A", fg="#EAECEE", text=self.name, font="Helvetica 13 bold",
+                               pady=5)
+        self.labelHead.place(relwidth=1)
+
+        self.line = Label(self.Window, width=450, bg="#ABB2B9")
+        self.line.place(relwidth=1, rely=0.07, relheight=0.012)
+
+        # the place where text appears
+        self.textCons = Text(self.Window, width=20, height=2, bg="white", fg="black", font="Helvetica 14", padx=5,
+                             pady=5)
+        self.textCons.place(relheight=0.745, relwidth=1, rely=0.08)
+
+        self.labelBottom = Label(self.Window, bg="#ABB2B9", height=80)
+        self.labelBottom.place(relwidth=1, rely=0.925)
+
+        # the text above the smaller box
+        self.labelDown = Label(self.Window, bg="pink", fg="black",
+                               text="Commands: all/online/\nmember's name/quit/\ngetfiles/file",
+                               font="Helvetica 10 bold", pady=6)
+        self.labelDown.place(relwidth=0.4, rely=0.825, relx=-0.05)
+
+        # the text above the bigger box
+        self.labelMsg = Label(self.Window, bg="#17202A", fg="#EAECEE",
+                              text="Type message/file name\n"
+                                   "(blank to online/quit/getfiles commands)",
+                              font="Helvetica 13 bold", pady=6)
+        self.labelMsg.place(relwidth=0.6, rely=0.85, relx=0.25)
+
+        # the small box
+        self.entryType = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
+        self.entryType.place(relwidth=0.26, relheight=0.03, rely=0.0, relx=0.011)
+        self.entryType.focus()
+
+        # the big box
+        self.entryMsg = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
+        self.entryMsg.place(relwidth=0.5, relheight=0.03, rely=0.0, relx=0.3)
+        self.entryMsg.focus()
+
+        # create a Send Button
+        self.buttonMsg = Button(self.labelBottom, text="Send", font="Helvetica 10 bold", width=20, bg="#ABB2B9",
+                                command=lambda: self.sendButton(self.entryType.get() + ':' + self.entryMsg.get()))
+        self.buttonMsg.place(relx=0.77, rely=0.0, relheight=0.03, relwidth=0.22)
+
+        self.textCons.config(cursor="arrow")
+
+        # create a scroll bar
+        scrollbar = Scrollbar(self.textCons)
+
+        # place the scroll bar into the gui window
+        scrollbar.place(relheight=1, relx=0.974)
+        scrollbar.config(command=self.textCons.yview)
+        self.textCons.config(state=DISABLED)
+
+    def sendButton(self, msg):
+        self.textCons.config(state=DISABLED)
+        self.msg = msg
+        self.entryMsg.delete(0, END)
+        self.entryType.delete(0, END)
+        self.sendMessage(clientSoc, fileSoc)
+
+    # client functions
     def connectToServer(self, soc: socket.socket, udp: socket.socket):
         # connecting to the server
 
@@ -88,90 +173,11 @@ class GUI:
             print(f"Connection failed due to: {e}")
             quit()
 
-    def go_ahead(self, name):
-        # Destroy this and all descendants widgets.
-        self.login.destroy()
-        self.layout(name)
-        # initialize a daemon thread to listen for incoming messages
-        self.connectToServer(clientSoc, fileSoc)
-        self.textCons.config(state=NORMAL)
-        self.textCons.insert(END, "Connected successfully" + "\n\n")
-        self.textCons.insert(END, menu + "\n\n")
-        self.textCons.config(state=DISABLED)
-        self.textCons.see(END)
-        Thread(target=self.getMessages, daemon=True, args=(clientSoc,)).start()
-
-# The main layout of the chat
-    def layout(self, name):
-        self.name = name
-        # to show chat window
-        self.Window.deiconify()
-        self.Window.title("ChatRoom")
-        self.Window.resizable(width=True, height=True)
-        self.Window.configure(width=900, height=730, bg='white')
-
-        # the label with the client's name
-        self.labelHead = Label(self.Window, bg="#17202A", fg="#EAECEE", text=self.name, font="Helvetica 13 bold", pady=5)
-        self.labelHead.place(relwidth=1)
-
-        self.line = Label(self.Window, width=450, bg="#ABB2B9")
-        self.line.place(relwidth=1, rely=0.07, relheight=0.012)
-
-        # the place where text appears
-        self.textCons = Text(self.Window, width=20, height=2, bg="white", fg="black", font="Helvetica 14", padx=5, pady=5)
-        self.textCons.place(relheight=0.745, relwidth=1, rely=0.08)
-
-        self.labelBottom = Label(self.Window, bg="#ABB2B9", height=80)
-        self.labelBottom.place(relwidth=1, rely=0.925)
-
-        # the text above the smaller box
-        self.labelDown = Label(self.Window, bg="pink", fg="black",
-                               text="Commands: all/online/\nmember's name/quit/\ngetfiles/file",
-                               font="Helvetica 10 bold", pady=6)
-        self.labelDown.place(relwidth=0.4 ,rely=0.825 , relx=-0.05)
-
-        # the text above the bigger box
-        self.labelMsg = Label(self.Window, bg="#17202A", fg="#EAECEE",
-                              text="Type message/file name\n"
-                                   "(blank to online/quit/getfiles commands)",
-                               font="Helvetica 13 bold", pady=6)
-        self.labelMsg.place(relwidth=0.6, rely=0.85, relx=0.25)
-
-        # the small box
-        self.entryType = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
-        self.entryType.place(relwidth=0.26, relheight=0.03, rely=0.0, relx=0.011)
-        self.entryType.focus()
-
-        # the big box
-        self.entryMsg = Entry(self.labelBottom, bg="#2C3E50", fg="#EAECEE", font="Helvetica 13")
-        self.entryMsg.place(relwidth=0.5, relheight=0.03, rely=0.0, relx=0.3)
-        self.entryMsg.focus()
-
-        # create a Send Button
-        self.buttonMsg = Button(self.labelBottom, text="Send", font="Helvetica 10 bold", width=20, bg="#ABB2B9",
-                                command=lambda: self.sendButton(self.entryType.get()+':'+self.entryMsg.get()))
-        self.buttonMsg.place(relx=0.77, rely=0.0, relheight=0.03, relwidth=0.22)
-
-        self.textCons.config(cursor="arrow")
-
-        # create a scroll bar
-        scrollbar = Scrollbar(self.textCons)
-
-        # place the scroll bar into the gui window
-        scrollbar.place(relheight=1, relx=0.974)
-        scrollbar.config(command=self.textCons.yview)
-        self.textCons.config(state=DISABLED)
-
-
-    # function to basically start sending messages
-    def sendButton(self, msg):
-        self.textCons.config(state=DISABLED)
-        self.msg = msg
-        self.entryMsg.delete(0, END)
-        self.entryType.delete(0, END)
-        self.sendMessage(clientSoc, fileSoc)
-
     def getMessages(self, soc: socket.socket):
+        """
+        run in the background, and intercept any messages sent to the user
+        from the server or other users
+        """
         while True:
             try:
                 message = soc.recv(2048).decode(FORMAT)
@@ -198,7 +204,10 @@ class GUI:
                 soc.close()
                 sys.exit()
 
-    def sendMessage(self, soc: socket.socket, fileSoc: socket.socket ):
+    def sendMessage(self, soc: socket.socket, fileSoc: socket.socket):
+        """
+        get a message from the user, and parse it to the correct server command
+        """
         print(menu)
         while True:
             message = self.msg
@@ -217,10 +226,14 @@ class GUI:
                 sys.exit()
 
     def getFile(self, fileSoc: socket.socket):
+        """
+        :param fileSoc:
+        called when the client receive a new file
+        """
         # get file name and the number of incoming packets
         # file names to text box
         self.textCons.config(state=NORMAL)
-        self.textCons.insert(END, "Incoming file" + "\n\n")
+        self.textCons.insert(END, "file downloaded" + "\n\n")
         self.textCons.config(state=DISABLED)
         self.textCons.see(END)
         print("Incoming file")
@@ -238,7 +251,7 @@ class GUI:
             while True:
 
                 # get packets from server
-                pac, addr = fileSoc.recvfrom(2048)
+                pac, addr = fileSoc.recvfrom(4096)
                 # check if the pac is part of the file or it is an ack request
                 seqNo = int.from_bytes(pac[:4], byteorder='big')
                 if seqNo == ACK_REQ:
@@ -255,14 +268,6 @@ class GUI:
                     else:
                         fileSoc.sendto('no'.encode(), addr)
                         return
-
-                # check if the packet was corrupted
-                # if remainder = 0, the packet is ok
-                # otherwise it's corrupted
-                # to_check = pac[:-32]
-                # remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
-                # old_remainder = pac[-32:]
-                # if remainder != old_remainder:
                 ans = self.corrupting_check(pac)
                 if ans == -1:
                     print("message corrupted")
@@ -287,6 +292,11 @@ class GUI:
             f.close()
 
     def corrupting_check(self, packet):
+        """
+        check if if packet was corrupted by comparing
+        its CRC remainder with a newly computed one
+        :param packet:
+        """
         to_check = packet[:-32]
         remainder = (binascii.crc32(to_check) & 0xffffffff).to_bytes(32, 'big')
         old_remainder = packet[-32:]
@@ -296,6 +306,3 @@ class GUI:
 
 if __name__ == '__main__':
     g = GUI()
-
-
-
