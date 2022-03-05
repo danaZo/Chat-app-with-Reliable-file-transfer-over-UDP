@@ -24,7 +24,6 @@ serverIp = socket.gethostname()
 menu = "WELCOME!\n\nAt the left side box, you can type the following commands:\n" \
        "all : To send a public message\n" \
        "member's name : To send a private message to specific member (write the member's name)\n" \
-       "quit : To quit the chat\n" \
        "online : To get a list of online members names\n" \
        "getfiles : To get the list of files that able to be downloaded\n" \
        "file : To download a file from the existing files"
@@ -112,14 +111,14 @@ class GUI:
 
         # the text above the smaller box
         self.labelDown = Label(self.Window, bg="pink", fg="black",
-                               text="Commands: all/online/\nmember's name/quit/\ngetfiles/file",
+                               text="Commands: all/online/\nmember's name/\ngetfiles/file",
                                font="Helvetica 10 bold", pady=6)
         self.labelDown.place(relwidth=0.4, rely=0.825, relx=-0.05)
 
         # the text above the bigger box
         self.labelMsg = Label(self.Window, bg="#17202A", fg="#EAECEE",
                               text="Type message/file name\n"
-                                   "(blank to online/quit/getfiles commands)",
+                                   "(blank to online/getfiles commands)",
                               font="Helvetica 13 bold", pady=6)
         self.labelMsg.place(relwidth=0.6, rely=0.85, relx=0.25)
 

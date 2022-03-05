@@ -9,8 +9,48 @@ from client import GUI
 
 class MyTestCase(unittest.TestCase):
 
+    def test_packetLost_andErrorDetectionTests(self):
+        # check if the file received is the file sent
+        """
+        IMPORTANT NOTE
+        the following assertions compare two files and check if they are identical.
+        We use these test to check for corruption detection and packet lost,
+        since if we transfered the files correctly our error detection adn packet recovery
+        mechanism works
 
+        How to generate random packet loss and data corruption:
 
+        1) have the server and the client on the same machine
+        2)run the server and insert the desired packet loss and/or
+        corruption date percentages.
+        3)run the client and ask for *ALL* of the files present in server, after it finished
+        you can close them both and run this test
+        """
+
+        client_gui = GUI()
+        tst_path = 'Amit.jpg'  # the name of file we downloaded
+        ref_path = 'Files/Amit.jpg'
+        self.assertTrue(filecmp.cmp(tst_path, ref_path, shallow=False))
+
+        tst_path1 = '01.pdf'  # the name of file we downloaded
+        ref_path1 = 'Files/01.pdf'
+        self.assertTrue(filecmp.cmp(tst_path1, ref_path1, shallow=False))
+
+        tst_path3 = '03.png'  # the name of file we downloaded
+        ref_path3 = 'Files/03.png'
+        self.assertTrue(filecmp.cmp(tst_path3, ref_path3, shallow=False))
+
+        tst_path2 = '02.doc'  # the name of file we downloaded
+        ref_path2 = 'Files/02.doc'
+        self.assertTrue(filecmp.cmp(tst_path2, ref_path2, shallow=False))
+
+        tst_path4 = 'hi.txt'  # the name of file we downloaded
+        ref_path4 = 'Files/hi.txt'
+        self.assertTrue(filecmp.cmp(tst_path4, ref_path4, shallow=False))
+
+        tst_path5 = 'pic.jpg'  # the name of file we downloaded
+        ref_path5 = 'Files/pic.jpg'
+        self.assertTrue(filecmp.cmp(tst_path5, ref_path5, shallow=False))
 
     def test_packet_corruption(self):
         # corrupting packets
@@ -45,28 +85,7 @@ class MyTestCase(unittest.TestCase):
         # the method should return -1
         self.assertEqual(-1, GUI.corrupting_check(self, bytes(raw3)))
 
-    def packetLost_andErrorDetectionTests(self):
-        # check if the file received is the file sent
-        """
-        IMPORTANT NOTE
-        the following assertions compare two files and check if they are identical.
-        We use these test to check for corruption detection and packet lost,
-        since if we transfered the files correctly our error detection adn packet recovery
-        mechanism works
 
-        How to generate random packet loss and data corruption:
-
-        1) have the server and the client on the same machine
-        2)run the server and insert the desired packet loss and/or
-        corruption date percentages.
-        3)run the client and ask for *ALL* of the files present in server, after it finished
-        you can close them both and run this test
-        """
-
-        client_gui = GUI()
-        tst_path = 'b1.pdf'  # the name of file we downloaded
-        ref_path = 'Files/b1.pdf'
-        self.assertTrue(filecmp.cmp(tst_path, ref_path, shallow=False))
 
 
 if __name__ == '__main__':
